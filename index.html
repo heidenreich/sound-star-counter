@@ -1,0 +1,379 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="theme-color" content="#0F8577">
+<title>Sound Star Counter</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@600;800&family=Nunito:wght@500;700&display=swap">
+<style>
+/* Layout: one-screen therapy board — star grid fills toward goal on the left, big clinician tap pad on the right; stacks on phones */
+:root {
+  --bg: #EAF3EF;
+  --surface: #FFFFFF;
+  --ink: #183833;
+  --muted: #5B7570;
+  --line: #CFE0DA;
+  --primary: #0F8577;
+  --primary-ink: #FFFFFF;
+  --miss: #B9C9C4;
+  --empty: #DCE9E4;
+  --s1: #FFB703; --s2: #FB6F92; --s3: #3A86FF; --s4: #8AC926; --s5: #9B5DE5;
+  --display: "Baloo 2", "Trebuchet MS", system-ui, sans-serif;
+  --body: "Nunito", system-ui, -apple-system, sans-serif;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --bg: #0E1C1A; --surface: #162B28; --ink: #E6F2EE; --muted: #93AEA8; --line: #24423D;
+  --primary: #23B5A3; --primary-ink: #04201C; --miss: #3A5651; --empty: #1F3834; color-scheme: dark;
+} }
+:root[data-theme="dark"] {
+  --bg: #0E1C1A; --surface: #162B28; --ink: #E6F2EE; --muted: #93AEA8; --line: #24423D;
+  --primary: #23B5A3; --primary-ink: #04201C; --miss: #3A5651; --empty: #1F3834; color-scheme: dark;
+}
+html, body { height: 100%; }
+body {
+  background: var(--bg); color: var(--ink); font-family: var(--body); font-size: 16px;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-block: 16px; box-sizing: border-box;
+  -webkit-user-select: none; user-select: none; -webkit-tap-highlight-color: transparent;
+}
+*, *::before, *::after { box-sizing: inherit; }
+button, input, select { font: inherit; color: inherit; }
+button { cursor: pointer; }
+:focus-visible { outline: 3px solid var(--s3); outline-offset: 3px; }
+
+.app { max-width: 1100px; margin: 0 auto; min-height: 100%; display: flex; flex-direction: column; gap: 16px; }
+
+header { display: flex; flex-wrap: wrap; align-items: center; gap: 12px 20px; }
+.brand { font-family: var(--display); font-weight: 800; font-size: 1.35rem; letter-spacing: .01em; margin: 0; flex: 1 1 auto; }
+.field { display: flex; align-items: center; gap: 8px; }
+.field label { font-size: .75rem; font-weight: 700; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); }
+#target {
+  width: 7.5ch; font-family: var(--display); font-weight: 800; font-size: 1.4rem; text-align: center;
+  background: var(--surface); border: 2px solid var(--line); border-radius: 12px; padding: 2px 8px;
+  -webkit-user-select: text; user-select: text;
+}
+#goal { background: var(--surface); border: 2px solid var(--line); border-radius: 12px; padding: 6px 10px; font-weight: 700; }
+.icon-btn { background: var(--surface); border: 2px solid var(--line); border-radius: 12px; padding: 6px 12px; font-weight: 700; color: var(--muted); }
+
+main { flex: 1; display: grid; grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr); gap: 20px; align-items: stretch; }
+@media (max-width: 760px) { main { grid-template-columns: 1fr; } }
+
+.board {
+  background: var(--surface); border: 2px solid var(--line); border-radius: 24px; padding: 20px;
+  display: flex; flex-direction: column; gap: 16px; min-width: 0;
+}
+.count-row { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+.count { font-family: var(--display); font-weight: 800; line-height: .9; font-size: clamp(3.5rem, 9vw, 5.5rem); font-variant-numeric: tabular-nums; }
+.count small { font-size: .38em; color: var(--muted); font-weight: 600; }
+.stats { text-align: right; font-size: .95rem; color: var(--muted); font-variant-numeric: tabular-nums; line-height: 1.5; }
+.stats b { color: var(--ink); }
+
+.progress { height: 14px; border-radius: 99px; background: var(--empty); overflow: hidden; }
+.progress > i { display: block; height: 100%; width: 0; border-radius: 99px;
+  background: linear-gradient(90deg, var(--s1), var(--s2), var(--s5), var(--s3), var(--s4));
+  background-size: 1100px 100%; transition: width .35s cubic-bezier(.3,1.4,.5,1); }
+
+.grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: clamp(6px, 1.4vw, 12px); }
+.cell { aspect-ratio: 1; max-width: 100%; border-radius: 50%; background: var(--empty); position: relative; display: grid; place-items: center; }
+.cell span { font-family: var(--display); font-weight: 600; color: var(--muted); opacity: .55; font-size: clamp(.8rem, 2vw, 1.05rem); }
+.cell svg { position: absolute; inset: -6%; width: 112%; height: 112%; transform: scale(0); }
+.cell.on { background: transparent; }
+.cell.on span { display: none; }
+.cell.on svg { transform: scale(1); animation: pop .5s cubic-bezier(.3,1.6,.5,1); }
+.grid.dense .cell span { display: none; }
+@keyframes pop { 0% { transform: scale(0) rotate(-60deg); } 100% { transform: scale(1) rotate(0); } }
+.row-done { animation: wiggle .6s ease; }
+@keyframes wiggle { 25% { transform: rotate(-8deg) scale(1.1); } 75% { transform: rotate(8deg) scale(1.1); } }
+
+.pad { display: flex; flex-direction: column; gap: 14px; min-width: 0; }
+#correct {
+  flex: 1; min-height: 220px; border: none; border-radius: 28px; background: var(--primary); color: var(--primary-ink);
+  font-family: var(--display); font-weight: 800; font-size: clamp(1.8rem, 4.5vw, 2.6rem); line-height: 1.05;
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px;
+  box-shadow: 0 8px 0 color-mix(in srgb, var(--primary) 60%, #000); transition: transform .08s, box-shadow .08s;
+  touch-action: manipulation;
+}
+#correct .snd { font-size: 1.5em; }
+#correct .hint { font-family: var(--body); font-weight: 700; font-size: .9rem; opacity: .8; }
+#correct:active, #correct.pressed { transform: translateY(6px); box-shadow: 0 2px 0 color-mix(in srgb, var(--primary) 60%, #000); }
+.row-btns { display: grid; grid-template-columns: 1.3fr 1fr 1fr; gap: 10px; }
+.row-btns button {
+  border: 2px solid var(--line); background: var(--surface); border-radius: 18px; padding: 14px 8px;
+  font-weight: 700; display: flex; flex-direction: column; align-items: center; gap: 2px; touch-action: manipulation;
+}
+.row-btns button small { font-weight: 500; color: var(--muted); font-size: .72rem; }
+.row-btns button:active { transform: translateY(2px); }
+#confirmReset { border-color: var(--s2); color: var(--s2); }
+
+.trials { display: flex; flex-wrap: wrap; gap: 4px; min-height: 12px; }
+.trials i { width: 10px; height: 10px; border-radius: 50%; background: var(--primary); }
+.trials i.x { background: var(--miss); }
+.trials-label { font-size: .72rem; font-weight: 700; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); }
+
+.toast {
+  position: fixed; left: 50%; top: calc(18px + env(safe-area-inset-top, 0px)); transform: translate(-50%, -140%);
+  background: var(--ink); color: var(--bg); font-family: var(--display); font-weight: 800; font-size: 1.4rem;
+  padding: 8px 22px; border-radius: 99px; transition: transform .35s cubic-bezier(.3,1.5,.5,1); z-index: 20; white-space: nowrap;
+}
+.toast.show { transform: translate(-50%, 0); }
+
+#fx { position: fixed; inset: 0; width: 100%; height: 100%; pointer-events: none; z-index: 30; }
+.win {
+  position: fixed; inset: 0; z-index: 25; display: grid; place-items: center;
+  background: color-mix(in srgb, var(--bg) 82%, transparent); backdrop-filter: blur(4px);
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px));
+}
+.win-card { background: var(--surface); border: 2px solid var(--line); border-radius: 28px; padding: 32px 28px; text-align: center; max-width: 440px; width: 100%; display: flex; flex-direction: column; gap: 12px; align-items: center; }
+.win-card .big-star { width: 120px; height: 120px; animation: spin 1.2s cubic-bezier(.3,1.4,.5,1); }
+@keyframes spin { from { transform: scale(0) rotate(-200deg); } to { transform: scale(1) rotate(0); } }
+.win-card h2 { font-family: var(--display); font-weight: 800; font-size: 2.2rem; margin: 0; line-height: 1; text-wrap: balance; }
+.win-card p { margin: 0; color: var(--muted); font-variant-numeric: tabular-nums; }
+.win-card .actions { display: flex; gap: 10px; flex-wrap: wrap; justify-content: center; margin-top: 6px; }
+.win-card button { border-radius: 16px; padding: 12px 20px; font-weight: 700; border: 2px solid var(--line); background: var(--surface); }
+.win-card button.go { background: var(--primary); color: var(--primary-ink); border-color: var(--primary); }
+
+footer { font-size: .8rem; color: var(--muted); text-align: center; }
+kbd { font-family: var(--body); font-weight: 700; border: 1px solid var(--line); border-bottom-width: 2px; border-radius: 6px; padding: 0 5px; background: var(--surface); }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation: none !important; transition: none !important; }
+}
+</style>
+<style>
+:root { padding-top: env(safe-area-inset-top, 0px); padding-bottom: env(safe-area-inset-bottom, 0px); }
+html { box-sizing: border-box; }
+body { margin: 0; }
+[hidden] { display: none !important; }
+</style>
+</head>
+<body>
+
+<div class="app">
+  <header>
+    <h1 class="brand">Sound Star Counter</h1>
+    <div class="field"><label for="target">Target</label><input id="target" value="/r/" maxlength="12" aria-label="Target sound"></div>
+    <div class="field"><label for="goal">Goal</label>
+      <select id="goal"><option>10</option><option>15</option><option>20</option><option selected>25</option><option>30</option><option>50</option></select>
+    </div>
+    <button class="icon-btn" id="soundToggle" aria-pressed="true">Chime: on</button>
+  </header>
+
+  <main>
+    <section class="board" aria-label="Progress">
+      <div class="count-row">
+        <div class="count" aria-live="polite"><span id="count">0</span><small> / <span id="goalOut">25</span></small></div>
+        <div class="stats">
+          <div><b id="attempts">0</b> attempts</div>
+          <div><b id="pct">–</b> accuracy</div>
+        </div>
+      </div>
+      <div class="progress"><i id="bar"></i></div>
+      <div class="grid" id="grid"></div>
+      <div>
+        <div class="trials-label">Trial record</div>
+        <div class="trials" id="trials" aria-label="Trial record: filled dots correct, grey dots not yet"></div>
+      </div>
+    </section>
+
+    <section class="pad">
+      <button id="correct" aria-label="Correct sound">
+        <span class="snd" id="sndLabel">/r/</span>
+        <span>Correct!</span>
+        <span class="hint">tap or press Space</span>
+      </button>
+      <div class="row-btns">
+        <button id="miss">Not yet<small>key N</small></button>
+        <button id="undo">Undo<small>key Z</small></button>
+        <button id="reset">New set<small>clear board</small></button>
+      </div>
+    </section>
+  </main>
+
+  <footer>Tap the big button for each correct production. “Not yet” logs an attempt without a star, so accuracy stays accurate.</footer>
+</div>
+
+<div class="toast" id="toast" role="status"></div>
+<canvas id="fx"></canvas>
+<div class="win" id="win" hidden>
+  <div class="win-card">
+    <svg class="big-star" viewBox="0 0 100 100" aria-hidden="true"><path d="M50 6l12.6 27.4 29.9 3.5-22.2 20.3 6 29.5L50 71.8 23.7 86.7l6-29.5L7.5 36.9l29.9-3.5z" fill="var(--s1)" stroke="color-mix(in srgb, var(--s1) 70%, #000)" stroke-width="3" stroke-linejoin="round"/></svg>
+    <h2 id="winTitle">25 stars!</h2>
+    <p id="winStats"></p>
+    <div class="actions">
+      <button class="go" id="again">Start a new set</button>
+      <button id="keep">Keep going</button>
+    </div>
+  </div>
+</div>
+
+<script>
+(() => {
+  const $ = id => document.getElementById(id);
+  const COLORS = ['--s1','--s2','--s3','--s4','--s5'];
+  const STAR = 'M50 6l12.6 27.4 29.9 3.5-22.2 20.3 6 29.5L50 71.8 23.7 86.7l6-29.5L7.5 36.9l29.9-3.5z';
+  const PRAISE = ['Great job!','Super sound!','Nice work!','You got it!','Awesome!','Way to go!'];
+
+  let state = { target: '/r/', goal: 25, trials: [], chime: true, celebrated: false };
+  try { const s = JSON.parse(localStorage.getItem('ssc-state') || 'null'); if (s && Array.isArray(s.trials)) state = { ...state, ...s }; } catch (e) {}
+  const save = () => { try { localStorage.setItem('ssc-state', JSON.stringify(state)); } catch (e) {} };
+
+  const correctCount = () => state.trials.filter(Boolean).length;
+
+  function buildGrid() {
+    const g = $('grid'); g.innerHTML = '';
+    g.classList.toggle('dense', state.goal > 30);
+    for (let i = 0; i < state.goal; i++) {
+      const c = document.createElement('div'); c.className = 'cell';
+      const col = `var(${COLORS[Math.floor(i / 5) % 5]})`;
+      c.innerHTML = `<span>${i + 1}</span><svg viewBox="0 0 100 100" aria-hidden="true"><path d="${STAR}" fill="${col}" stroke="color-mix(in srgb, ${col} 65%, #000)" stroke-width="3" stroke-linejoin="round"/></svg>`;
+      g.appendChild(c);
+    }
+  }
+
+  function render() {
+    const n = correctCount(), att = state.trials.length;
+    $('count').textContent = n;
+    $('goalOut').textContent = state.goal;
+    $('attempts').textContent = att;
+    $('pct').textContent = att ? Math.round(n / att * 100) + '%' : '–';
+    $('bar').style.width = Math.min(100, n / state.goal * 100) + '%';
+    $('sndLabel').textContent = state.target || 'Sound';
+    [...$('grid').children].forEach((c, i) => c.classList.toggle('on', i < n));
+    const t = $('trials'); t.innerHTML = '';
+    state.trials.forEach(ok => { const d = document.createElement('i'); if (!ok) d.className = 'x'; t.appendChild(d); });
+    $('soundToggle').textContent = 'Chime: ' + (state.chime ? 'on' : 'off');
+    $('soundToggle').setAttribute('aria-pressed', state.chime);
+  }
+
+  // --- audio ---
+  let ac;
+  function tone(freqs, dur = .12, gap = .08, type = 'triangle') {
+    if (!state.chime) return;
+    try {
+      ac = ac || new (window.AudioContext || window.webkitAudioContext)();
+      freqs.forEach((f, i) => {
+        const o = ac.createOscillator(), g = ac.createGain(), t0 = ac.currentTime + i * gap;
+        o.type = type; o.frequency.value = f;
+        g.gain.setValueAtTime(0.0001, t0); g.gain.exponentialRampToValueAtTime(0.25, t0 + .02);
+        g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur + .2);
+        o.connect(g).connect(ac.destination); o.start(t0); o.stop(t0 + dur + .25);
+      });
+    } catch (e) {}
+  }
+
+  // --- toast ---
+  let toastT;
+  function toast(msg) {
+    const el = $('toast'); el.textContent = msg; el.classList.add('show');
+    clearTimeout(toastT); toastT = setTimeout(() => el.classList.remove('show'), 1400);
+  }
+
+  // --- confetti ---
+  const cv = $('fx'), cx = cv.getContext('2d'); let parts = [], raf;
+  const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  function burst(x, y, count, spread) {
+    if (reduce) return;
+    const dpr = devicePixelRatio || 1; cv.width = innerWidth * dpr; cv.height = innerHeight * dpr; cx.setTransform(dpr,0,0,dpr,0,0);
+    const cs = getComputedStyle(document.documentElement);
+    const cols = COLORS.map(c => cs.getPropertyValue(c).trim());
+    for (let i = 0; i < count; i++) {
+      const a = Math.random() * Math.PI * 2, v = 3 + Math.random() * spread;
+      parts.push({ x, y, vx: Math.cos(a) * v, vy: Math.sin(a) * v - spread * .4, r: 4 + Math.random() * 6,
+        rot: Math.random() * 6, vr: (Math.random() - .5) * .3, c: cols[i % 5], life: 1, star: Math.random() < .35 });
+    }
+    if (!raf) raf = requestAnimationFrame(tick);
+  }
+  function drawStar(r) { cx.beginPath(); for (let i = 0; i < 10; i++) { const rr = i % 2 ? r * .45 : r; const a = i * Math.PI / 5 - Math.PI / 2; cx.lineTo(Math.cos(a) * rr, Math.sin(a) * rr); } cx.closePath(); cx.fill(); }
+  function tick() {
+    cx.clearRect(0, 0, innerWidth, innerHeight);
+    parts = parts.filter(p => p.life > 0 && p.y < innerHeight + 40);
+    for (const p of parts) {
+      p.vy += .18; p.vx *= .99; p.x += p.vx; p.y += p.vy; p.rot += p.vr; p.life -= .006;
+      cx.save(); cx.globalAlpha = Math.max(0, Math.min(1, p.life * 2)); cx.translate(p.x, p.y); cx.rotate(p.rot); cx.fillStyle = p.c;
+      if (p.star) drawStar(p.r * 1.3); else cx.fillRect(-p.r / 2, -p.r / 4, p.r, p.r / 2);
+      cx.restore();
+    }
+    raf = parts.length ? requestAnimationFrame(tick) : (cx.clearRect(0, 0, innerWidth, innerHeight), 0);
+  }
+
+  // --- actions ---
+  function correct() {
+    state.trials.push(true); save(); render();
+    const n = correctCount();
+    const cell = $('grid').children[n - 1];
+    if (cell) {
+      const r = cell.getBoundingClientRect();
+      burst(r.left + r.width / 2, r.top + r.height / 2, 14, 5);
+    }
+    if (n === state.goal && !state.celebrated) {
+      state.celebrated = true; save(); celebrate(); return;
+    }
+    if (n % 5 === 0 && n < state.goal) {
+      tone([523, 659, 784, 1047], .12, .09);
+      toast(`${n} stars! ${PRAISE[(n / 5) % PRAISE.length]}`);
+      const row = [...$('grid').children].slice(n - 5, n);
+      row.forEach(c => { c.classList.remove('row-done'); void c.offsetWidth; c.classList.add('row-done'); });
+    } else {
+      tone([660 + (n % 5) * 70, 990 + (n % 5) * 70], .08, .06);
+    }
+  }
+  function miss() { state.trials.push(false); save(); render(); tone([330], .06, 0, 'sine'); }
+  function undo() {
+    if (!state.trials.length) return;
+    state.trials.pop(); if (correctCount() < state.goal) state.celebrated = false; save(); render(); toast('Undone');
+  }
+  function newSet() { state.trials = []; state.celebrated = false; $('win').hidden = true; save(); render(); }
+
+  function celebrate() {
+    tone([523, 659, 784, 1047, 784, 1047, 1319], .16, .11);
+    const n = correctCount(), att = state.trials.length;
+    $('winTitle').textContent = `${n} ${state.target} stars!`;
+    $('winStats').textContent = `${n} correct in ${att} attempts · ${Math.round(n / att * 100)}% accuracy`;
+    $('win').hidden = false;
+    for (let i = 0; i < 4; i++) setTimeout(() => burst(innerWidth * (.15 + .7 * Math.random()), innerHeight * .35, 70, 10), i * 280);
+    $('again').focus();
+  }
+
+  // reset needs a second tap (no confirm() in the viewer)
+  let resetArmed = 0;
+  $('reset').addEventListener('click', e => {
+    const b = e.currentTarget;
+    if (!state.trials.length) return;
+    if (resetArmed) { clearTimeout(resetArmed); resetArmed = 0; b.id = 'reset'; b.innerHTML = 'New set<small>clear board</small>'; newSet(); toast('New set started'); return; }
+    b.id = 'confirmReset'; b.innerHTML = 'Tap again<small>to clear</small>';
+    resetArmed = setTimeout(() => { resetArmed = 0; b.id = 'reset'; b.innerHTML = 'New set<small>clear board</small>'; }, 2500);
+  });
+
+  $('correct').addEventListener('click', correct);
+  $('miss').addEventListener('click', miss);
+  $('undo').addEventListener('click', undo);
+  $('again').addEventListener('click', newSet);
+  $('keep').addEventListener('click', () => { $('win').hidden = true; });
+  $('soundToggle').addEventListener('click', () => { state.chime = !state.chime; save(); render(); });
+  $('target').addEventListener('input', e => { state.target = e.target.value.trim(); save(); render(); });
+  $('goal').addEventListener('change', e => {
+    state.goal = +e.target.value; state.celebrated = correctCount() >= state.goal; save(); buildGrid(); render();
+  });
+
+  document.addEventListener('keydown', e => {
+    if (e.target.matches('input, select')) return;
+    if (e.code === 'Space' || e.key === 'Enter') {
+      if (!$('win').hidden) return;
+      e.preventDefault(); $('correct').classList.add('pressed'); setTimeout(() => $('correct').classList.remove('pressed'), 90); correct();
+    } else if (e.key === 'n' || e.key === 'N') miss();
+    else if (e.key === 'z' || e.key === 'Z') undo();
+  });
+
+  $('target').value = state.target;
+  $('goal').value = String(state.goal);
+  buildGrid(); render();
+
+  // keep the screen awake during a session, if allowed
+  try { navigator.wakeLock?.request('screen').catch(() => {}); } catch (e) {}
+})();
+</script>
+</body>
+</html>
