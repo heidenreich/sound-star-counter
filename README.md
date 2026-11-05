@@ -4,7 +4,8 @@ A tap counter for speech-sound practice. The clinician taps **Correct!** each ti
 
 ## Features
 
-- **Star board:** one star per correct production, in rows of five.
+- **Reward board:** one reward per correct production, in rows of five.
+- **Choosable reward themes:** Stars, Ocean (fish), Garden (flowers), Space (rockets) and Paws (paw prints). Each theme has its own shapes, colors and button color. You can switch themes mid-set and the count stays the same.
 - **Rewards:** a chime and a little confetti on every tap. Every 5 stars, the row wiggles and a praise message appears. At the goal, a full-screen celebration with confetti.
 - **Accuracy tracking:** **Not yet** logs an attempt without a star, so you get correct / attempts / % accuracy plus a trial-by-trial dot record.
 - **Editable target sound** (e.g. `/r/`, `/s/`, `th`) and goal (10, 15, 20, 25, 30 or 50).

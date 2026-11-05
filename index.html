@@ -31,6 +31,11 @@
   --bg: #0E1C1A; --surface: #162B28; --ink: #E6F2EE; --muted: #93AEA8; --line: #24423D;
   --primary: #23B5A3; --primary-ink: #04201C; --miss: #3A5651; --empty: #1F3834; color-scheme: dark;
 }
+/* Reward themes recolour the main button; mid-tones that hold white text in both modes */
+:root[data-skin="ocean"]  { --primary: #1F6FC5; --primary-ink: #FFFFFF; }
+:root[data-skin="garden"] { --primary: #2E8540; --primary-ink: #FFFFFF; }
+:root[data-skin="space"]  { --primary: #5B3CC4; --primary-ink: #FFFFFF; }
+:root[data-skin="paws"]   { --primary: #B5521B; --primary-ink: #FFFFFF; }
 html, body { height: 100%; }
 body {
   background: var(--bg); color: var(--ink); font-family: var(--body); font-size: 16px;
@@ -57,6 +62,16 @@ header { display: flex; flex-wrap: wrap; align-items: center; gap: 12px 20px; }
 }
 #goal { background: var(--surface); border: 2px solid var(--line); border-radius: 12px; padding: 6px 10px; font-weight: 700; }
 .icon-btn { background: var(--surface); border: 2px solid var(--line); border-radius: 12px; padding: 6px 12px; font-weight: 700; color: var(--muted); }
+
+.skins { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.skins .lbl { font-size: .75rem; font-weight: 700; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); margin-right: 4px; }
+.skin {
+  display: flex; align-items: center; gap: 6px; border: 2px solid var(--line); background: var(--surface);
+  border-radius: 99px; padding: 4px 14px 4px 6px; font-weight: 700; touch-action: manipulation;
+}
+.skin svg { width: 28px; height: 28px; flex: none; }
+.skin[aria-pressed="true"] { border-color: var(--primary); background: color-mix(in srgb, var(--primary) 15%, var(--surface)); }
+.skin:active { transform: translateY(1px); }
 
 main { flex: 1; display: grid; grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr); gap: 20px; align-items: stretch; }
 @media (max-width: 760px) { main { grid-template-columns: 1fr; } }
@@ -161,6 +176,8 @@ body { margin: 0; }
     <button class="icon-btn" id="soundToggle" aria-pressed="true">Chime: on</button>
   </header>
 
+  <div class="skins" role="group" aria-label="Reward theme" id="skins"><span class="lbl">Rewards</span></div>
+
   <main>
     <section class="board" aria-label="Progress">
       <div class="count-row">
@@ -199,8 +216,8 @@ body { margin: 0; }
 <canvas id="fx"></canvas>
 <div class="win" id="win" hidden>
   <div class="win-card">
-    <svg class="big-star" viewBox="0 0 100 100" aria-hidden="true"><path d="M50 6l12.6 27.4 29.9 3.5-22.2 20.3 6 29.5L50 71.8 23.7 86.7l6-29.5L7.5 36.9l29.9-3.5z" fill="var(--s1)" stroke="color-mix(in srgb, var(--s1) 70%, #000)" stroke-width="3" stroke-linejoin="round"/></svg>
-    <h2 id="winTitle">25 stars!</h2>
+    <svg class="big-star" id="bigIcon" viewBox="0 0 100 100" aria-hidden="true"></svg>
+    <h2 id="winTitle">Goal reached!</h2>
     <p id="winStats"></p>
     <div class="actions">
       <button class="go" id="again">Start a new set</button>
@@ -216,7 +233,37 @@ body { margin: 0; }
   const STAR = 'M50 6l12.6 27.4 29.9 3.5-22.2 20.3 6 29.5L50 71.8 23.7 86.7l6-29.5L7.5 36.9l29.9-3.5z';
   const PRAISE = ['Great job!','Super sound!','Nice work!','You got it!','Awesome!','Way to go!'];
 
-  let state = { target: '/r/', goal: 25, trials: [], chime: true, celebrated: false };
+  // darken a hex colour for outlines
+  const shade = (hex, f = .62) => '#' + [1, 3, 5].map(i => Math.round(parseInt(hex.slice(i, i + 2), 16) * f).toString(16).padStart(2, '0')).join('');
+  const outline = c => `stroke="${shade(c)}" stroke-width="3" stroke-linejoin="round"`;
+
+  const SKINS = {
+    stars: { name: 'Stars', noun: 'stars', colors: ['#FFB703','#FB6F92','#3A86FF','#8AC926','#9B5DE5'],
+      draw: c => `<path d="${STAR}" fill="${c}" ${outline(c)}/>` },
+    ocean: { name: 'Ocean', noun: 'fish', colors: ['#FF8C42','#2EC4B6','#FFD23F','#EE6C9D','#4D9DE0'],
+      draw: c => `<path d="M70 50L95 27V73Z" fill="${c}" ${outline(c)}/>
+        <path d="M6 50C21 21 57 19 78 50C57 81 21 79 6 50Z" fill="${c}" ${outline(c)}/>
+        <path d="M47 33q9 17 0 34" fill="none" stroke="${shade(c)}" stroke-width="3" stroke-linecap="round"/>
+        <circle cx="27" cy="45" r="7" fill="#fff"/><circle cx="25.5" cy="45" r="3.5" fill="#1b1b1b"/>` },
+    garden: { name: 'Garden', noun: 'flowers', colors: ['#F15BB5','#FF6B6B','#9B5DE5','#FF9F1C','#4CC9F0'],
+      draw: c => [0,1,2,3,4].map(k => { const a = (k * 72 - 90) * Math.PI / 180;
+          return `<circle cx="${(50 + 26 * Math.cos(a)).toFixed(1)}" cy="${(50 + 26 * Math.sin(a)).toFixed(1)}" r="18" fill="${c}" ${outline(c)}/>`; }).join('')
+        + `<circle cx="50" cy="50" r="14" fill="#FFE066" ${outline('#FFE066')}/>` },
+    space: { name: 'Space', noun: 'rockets', colors: ['#E63946','#4CC9F0','#F4A261','#9B5DE5','#2EC4B6'],
+      draw: c => `<path d="M41 74L50 97L59 74Z" fill="#FF9F1C" ${outline('#FF9F1C')}/>
+        <path d="M35 55L18 80L36 74Z" fill="${c}" ${outline(c)}/><path d="M65 55L82 80L64 74Z" fill="${c}" ${outline(c)}/>
+        <path d="M50 5C67 20 72 44 67 75H33C28 44 33 20 50 5Z" fill="${c}" ${outline(c)}/>
+        <circle cx="50" cy="40" r="10" fill="#E8F4FF" ${outline('#E8F4FF')}/>` },
+    paws: { name: 'Paws', noun: 'paw prints', colors: ['#E07A5F','#F2A541','#B5838D','#81B29A','#8E7DBE'],
+      draw: c => `<path d="M50 50C67 50 80 65 78 78C76 91 63 89 50 87C37 89 24 91 22 78C20 65 33 50 50 50Z" fill="${c}" ${outline(c)}/>
+        <ellipse cx="20" cy="42" rx="9" ry="12" transform="rotate(-25 20 42)" fill="${c}" ${outline(c)}/>
+        <ellipse cx="38" cy="22" rx="9" ry="12" transform="rotate(-8 38 22)" fill="${c}" ${outline(c)}/>
+        <ellipse cx="62" cy="22" rx="9" ry="12" transform="rotate(8 62 22)" fill="${c}" ${outline(c)}/>
+        <ellipse cx="80" cy="42" rx="9" ry="12" transform="rotate(25 80 42)" fill="${c}" ${outline(c)}/>` },
+  };
+  const skin = () => SKINS[state.skin] || SKINS.stars;
+
+  let state = { target: '/r/', goal: 25, trials: [], chime: true, celebrated: false, skin: 'stars' };
   try { const s = JSON.parse(localStorage.getItem('ssc-state') || 'null'); if (s && Array.isArray(s.trials)) state = { ...state, ...s }; } catch (e) {}
   const save = () => { try { localStorage.setItem('ssc-state', JSON.stringify(state)); } catch (e) {} };
 
@@ -227,10 +274,30 @@ body { margin: 0; }
     g.classList.toggle('dense', state.goal > 30);
     for (let i = 0; i < state.goal; i++) {
       const c = document.createElement('div'); c.className = 'cell';
-      const col = `var(${COLORS[Math.floor(i / 5) % 5]})`;
-      c.innerHTML = `<span>${i + 1}</span><svg viewBox="0 0 100 100" aria-hidden="true"><path d="${STAR}" fill="${col}" stroke="color-mix(in srgb, ${col} 65%, #000)" stroke-width="3" stroke-linejoin="round"/></svg>`;
+      const sk = skin();
+      c.innerHTML = `<span>${i + 1}</span><svg viewBox="0 0 100 100" aria-hidden="true">${sk.draw(sk.colors[Math.floor(i / 5) % 5])}</svg>`;
       g.appendChild(c);
     }
+  }
+
+  function applySkin() {
+    const sk = skin(), root = document.documentElement;
+    if (state.skin && state.skin !== 'stars') root.dataset.skin = state.skin; else delete root.dataset.skin;
+    sk.colors.forEach((c, i) => root.style.setProperty(COLORS[i], c));
+    $('bigIcon').innerHTML = sk.draw(sk.colors[0]);
+    document.querySelectorAll('.skin').forEach(b => b.setAttribute('aria-pressed', b.dataset.skin === state.skin));
+    $('trials').setAttribute('aria-label', `Trial record: coloured dots correct, grey dots not yet`);
+  }
+
+  function buildSkinPicker() {
+    const wrap = $('skins');
+    Object.entries(SKINS).forEach(([key, sk]) => {
+      const b = document.createElement('button');
+      b.className = 'skin'; b.dataset.skin = key; b.type = 'button';
+      b.innerHTML = `<svg viewBox="0 0 100 100" aria-hidden="true">${sk.draw(sk.colors[0])}</svg>${sk.name}`;
+      b.addEventListener('click', () => { state.skin = key; save(); applySkin(); buildGrid(); render(); });
+      wrap.appendChild(b);
+    });
   }
 
   function render() {
@@ -313,7 +380,7 @@ body { margin: 0; }
     }
     if (n % 5 === 0 && n < state.goal) {
       tone([523, 659, 784, 1047], .12, .09);
-      toast(`${n} stars! ${PRAISE[(n / 5) % PRAISE.length]}`);
+      toast(`${n} ${skin().noun}! ${PRAISE[(n / 5) % PRAISE.length]}`);
       const row = [...$('grid').children].slice(n - 5, n);
       row.forEach(c => { c.classList.remove('row-done'); void c.offsetWidth; c.classList.add('row-done'); });
     } else {
@@ -330,7 +397,7 @@ body { margin: 0; }
   function celebrate() {
     tone([523, 659, 784, 1047, 784, 1047, 1319], .16, .11);
     const n = correctCount(), att = state.trials.length;
-    $('winTitle').textContent = `${n} ${state.target} stars!`;
+    $('winTitle').textContent = `${n} ${state.target} ${skin().noun}!`;
     $('winStats').textContent = `${n} correct in ${att} attempts · ${Math.round(n / att * 100)}% accuracy`;
     $('win').hidden = false;
     for (let i = 0; i < 4; i++) setTimeout(() => burst(innerWidth * (.15 + .7 * Math.random()), innerHeight * .35, 70, 10), i * 280);
@@ -369,7 +436,8 @@ body { margin: 0; }
 
   $('target').value = state.target;
   $('goal').value = String(state.goal);
-  buildGrid(); render();
+  if (!SKINS[state.skin]) state.skin = 'stars';
+  buildSkinPicker(); applySkin(); buildGrid(); render();
 
   // keep the screen awake during a session, if allowed
   try { navigator.wakeLock?.request('screen').catch(() => {}); } catch (e) {}
